@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>InspectSummary v9 真實資料串接（照護隨行本）</title>
+<style>
+  body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background: #F0F2F1; margin: 0; }
+  header { background: #0F5F54; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  header a { color: #ffd9a8; }
+  main { display: flex; gap: 16px; padding: 16px 24px; align-items: flex-start; }
+  .panel { background: #fff; border-radius: 6px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .left { flex: 0 0 460px; }
+  .right { flex: 1; min-height: 80vh; }
+  h2 { font-size: 15px; color: #0F5F54; border-bottom: 2px solid #0F5F54; padding-bottom: 6px; }
+  label { display: block; font-size: 12.5px; color: #5C6B68; margin: 10px 0 4px; }
+  input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #D3DCD9; border-radius: 4px; font-size: 13px; font-family: inherit; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  button { margin-top: 16px; width: 100%; background: #0F5F54; color: #fff; border: none; padding: 10px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+  button:hover { background: #0c4a41; }
+  button:disabled { background: #9AA5A1; cursor: not-allowed; }
+  #status { margin-top: 10px; font-size: 12.5px; color: #5C6B68; white-space: pre-wrap; }
+  #status.error { color: #A32D2D; }
+  .placeholder { color: #9AA5A1; font-size: 13px; padding: 40px; text-align: center; }
+  .hint { font-size: 11px; color: #9AA5A1; margin-top: 2px; }
+  .dl-btn { display: inline-block; margin-bottom: 10px; padding: 7px 14px; background: #C8622A; color: #fff;
+            border-radius: 4px; font-size: 13px; text-decoration: none; }
+  .dl-btn:hover { background: #a94f20; }
+  .link-box { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .link-box input { flex: 1; font-family: Consolas, monospace; font-size: 12px; color: #0F5F54; }
+  .link-box button { margin: 0; width: auto; padding: 7px 14px; font-size: 13px; }
+  .history-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .history-table th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #0F5F54; color: #0F5F54; font-size: 12.5px; }
+  .history-table td { padding: 6px 8px; border-bottom: 1px solid #E3E9E7; }
+  .history-table tr:hover td { background: #F0F5F4; }
+  .history-table a { color: #C8622A; font-weight: 700; text-decoration: none; }
+  .history-table a:hover { text-decoration: underline; }
+  .history-empty { color: #9AA5A1; font-size: 13px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>InspectSummary v9 真實資料串接（照護隨行本）</h1>
+  <p>輸入照護隨行本系統的個案編號（CaseID），後端會直接向 carenote 拉取該個案的登打資料（生命徵象＋照護紀錄）並產生摘要圖片——不用手貼 JSON。日期區間可省略，預設「前三月月初～今天」。手貼 JSON 的測試頁在 <a href="/">這裡</a>。</p>
+</header>
+<main>
+  <div class="panel left">
+    <h2>真實資料來源</h2>
+    <label>個案編號（CaseID）</label>
+    <input id="caseID" type="number" min="1" placeholder="例：48">
+    <div class="hint">照護隨行本（carenote）系統內的個案編號；個案姓名、性別、年齡會一併從上游帶回。</div>
+    <div class="row">
+      <div>
+        <label>起始日（選填）</label>
+        <input id="dateFrom" type="date">
+      </div>
+      <div>
+        <label>結束日（選填）</label>
+        <input id="dateTo" type="date">
+      </div>
+    </div>
+    <div class="hint">兩者皆可留空：預設區間為「前三月月初～今天」，正好是「前三月 vs 本月」比較需要的範圍。</div>
+
+    <button id="runBtn">向 carenote 拉取資料並產生摘要</button>
+    <div id="status"></div>
+
+    <h2 style="margin-top:24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0F5F54;">
+      <span style="border-bottom:none;">產生紀錄</span>
+      <button id="toggleHistoryBtn" type="button"
+              style="margin:0;width:auto;padding:4px 10px;font-size:12px;">顯示</button>
+    </h2>
+    <div id="historyArea" style="display:none;"><div class="history-empty">尚無紀錄。</div></div>
+  </div>
+  <div class="panel right">
+    <h2>圖片預覽</h2>
+    <div id="downloadArea"></div>
+    <div id="previewArea"><div class="placeholder">輸入個案編號後按「拉取並產生」。</div></div>
+  </div>
+</main>
+<script>
+const API = '/api/v1';
+const runBtn = document.getElementById('runBtn');
+const statusEl = document.getElementById('status');
+const previewArea = document.getElementById('previewArea');
+const downloadArea = document.getElementById('downloadArea');
+
+runBtn.addEventListener('click', async () => {
+  statusEl.className = '';
+  statusEl.textContent = '';
+
+  const caseID = parseInt(document.getElementById('caseID').value, 10);
+  if (!caseID || caseID <= 0) {
+    statusEl.className = 'error';
+    statusEl.textContent = '請輸入正整數的個案編號';
+    return;
+  }
+  const body = { caseID };
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  if (from) body.from = from;
+  if (to) body.to = to;
+
+  runBtn.disabled = true;
+  statusEl.textContent = '向 carenote 拉取登打資料中…';
+  try {
+    const res = await fetch(`${API}/v9/generate-from-carenote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    statusEl.textContent = `已取得 ${data.event_count} 筆登打資料（${data.from} ~ ${data.to}），運算中…`;
+    await pollUntilDone(data.job_id, `已取得 ${data.event_count} 筆（${data.from} ~ ${data.to}）`);
+  } catch (err) {
+    statusEl.className = 'error';
+    statusEl.textContent = `失敗：${err.message}`;
+  } finally {
+    runBtn.disabled = false;
+  }
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function pollUntilDone(jobId, fetchedNote, intervalMs = 1500, maxWaitMs = 120000) {
+  const startedAt = Date.now();
+  while (true) {
+    const res = await fetch(`${API}/v9/${jobId}/status`);
+    const job = await res.json();
+    if (!res.ok) throw new Error(job.detail || `HTTP ${res.status}`);
+
+    if (job.status === 'done') {
+      statusEl.textContent = `${fetchedNote}\n完成，job_id=${jobId}（生成方式：${job.generation_method}）`;
+      showReport(jobId);
+      refreshHistory();
+      return;
+    }
+    if (job.status === 'error') {
+      throw new Error(job.error || '運算失敗');
+    }
+    if (Date.now() - startedAt > maxWaitMs) {
+      throw new Error('等待逾時，請稍後至「產生紀錄」查看是否完成');
+    }
+    statusEl.textContent = `${fetchedNote}\n運算中…（可能需要呼叫LLM潤飾文字，請稍候）`;
+    await sleep(intervalMs);
+  }
+}
+
+function showReport(id) {
+  const imgUrl = `${API}/v9/${id}/png`;
+  const fullUrl = `${location.origin}${imgUrl}`;
+  downloadArea.innerHTML = `
+    <a class="dl-btn" href="${imgUrl}" download="v9_report_${id}.png">下載圖片</a>
+    <div class="link-box">
+      <input type="text" readonly value="${fullUrl}" onclick="this.select()">
+      <button type="button" onclick="navigator.clipboard.writeText('${fullUrl}').then(()=>{this.textContent='已複製';setTimeout(()=>this.textContent='複製連結',1500)})">複製連結</button>
+      <button type="button" onclick="window.open('${fullUrl}','_blank')">開新分頁</button>
+    </div>`;
+  previewArea.innerHTML = `<img src="${imgUrl}" style="max-width:100%;height:auto;display:block;">`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function refreshHistory() {
+  try {
+    const res = await fetch(`${API}/v9/reports`);
+    if (!res.ok) return;
+    const records = await res.json();
+    const area = document.getElementById('historyArea');
+    if (!records.length) {
+      area.innerHTML = '<div class="history-empty">尚無紀錄。</div>';
+      return;
+    }
+    area.innerHTML = `
+      <table class="history-table">
+        <thead><tr><th>時間</th><th>姓名</th><th>報告</th></tr></thead>
+        <tbody>${records.map(r => `
+          <tr>
+            <td>${esc(r.created_at)}</td>
+            <td>${esc(r.name)}</td>
+            <td><a href="#" onclick="showReport('${r.id}');return false;">預覽</a>&nbsp;&nbsp;
+                <a href="${API}/v9/${r.id}/png" target="_blank">開啟圖片</a></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (_) { /* 紀錄載入失敗不影響主要功能 */ }
+}
+
+refreshHistory();
+
+// ── 產生紀錄顯示/隱藏切換 ─────────────────────────────────────────────────
+// 2026-08-20新增：測試頁每次都會列出所有歷史產生紀錄，筆數一多會把版面
+// 拉得很長、擋住其他區塊——改成預設收合，使用者要看的時候自己按開，不
+// 需要每次都捲過一長串舊紀錄。
+const historyArea = document.getElementById('historyArea');
+const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
+toggleHistoryBtn.addEventListener('click', () => {
+  const hidden = historyArea.style.display === 'none';
+  historyArea.style.display = hidden ? 'block' : 'none';
+  toggleHistoryBtn.textContent = hidden ? '隱藏' : '顯示';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+name: Deploy main
+
+# 推送到 main 即自動部署到正式環境（self-hosted runner，部署路徑與網域於環境自行設定）
+# 也可在 Actions 頁面手動觸發
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Deploy main branch
+        run: ./deploy/deploy-main.sh

@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Secrets (no .env convention wired up yet — this is a defensive default so
+# one doesn't get committed by accident if someone adds it later)
+.env
+.env.*
+!.env.example
+
+# Output files
+output/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code (keep skills shared; ignore local settings)
+.claude/settings.local.json
+
+# Scratch / planning files
+idea.md
+command.txt
+*.pdf
+plan*.md
+plan-zh*.md
+spec.md
+
+# Ad-hoc scratch scripts dropped in the repo root while debugging — the real
+# suite lives in tests/ and is tracked (see the negation below).
+/test_*.py
+main.py
+!tests/

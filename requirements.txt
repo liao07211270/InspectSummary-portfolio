@@ -1,0 +1,14 @@
+pandas>=2.0
+numpy>=1.26
+scipy>=1.11
+openai>=1.30
+opencc-python-reimplemented>=0.1.7
+reportlab>=4.0
+python-dateutil>=2.9
+requests>=2.31
+fastapi>=0.111
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# 開發/測試用，不需要跟著部署到正式環境
+pytest>=7.0

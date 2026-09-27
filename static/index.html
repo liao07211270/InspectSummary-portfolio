@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>InspectSummary v9 版面測試</title>
+<style>
+  body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; background: #F0F2F1; margin: 0; }
+  header { background: #0F5F54; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  main { display: flex; gap: 16px; padding: 16px 24px; align-items: flex-start; }
+  .panel { background: #fff; border-radius: 6px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .left { flex: 0 0 460px; }
+  .right { flex: 1; min-height: 80vh; }
+  h2 { font-size: 15px; color: #0F5F54; border-bottom: 2px solid #0F5F54; padding-bottom: 6px; }
+  label { display: block; font-size: 12.5px; color: #5C6B68; margin: 10px 0 4px; }
+  input, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #D3DCD9; border-radius: 4px; font-size: 13px; font-family: inherit; }
+  textarea { font-family: Consolas, monospace; font-size: 11.5px; resize: vertical; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  button { margin-top: 16px; width: 100%; background: #0F5F54; color: #fff; border: none; padding: 10px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+  button:hover { background: #0c4a41; }
+  button:disabled { background: #9AA5A1; cursor: not-allowed; }
+  #status { margin-top: 10px; font-size: 12.5px; color: #5C6B68; white-space: pre-wrap; }
+  #status.error { color: #A32D2D; }
+  iframe { width: 100%; height: 80vh; border: 1px solid #D3DCD9; border-radius: 4px; }
+  .placeholder { color: #9AA5A1; font-size: 13px; padding: 40px; text-align: center; }
+  .hint { font-size: 11px; color: #9AA5A1; margin-top: 2px; }
+  .dl-btn { display: inline-block; margin-bottom: 10px; padding: 7px 14px; background: #C8622A; color: #fff;
+            border-radius: 4px; font-size: 13px; text-decoration: none; }
+  .dl-btn:hover { background: #a94f20; }
+  .link-box { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .link-box input { flex: 1; font-family: Consolas, monospace; font-size: 12px; color: #0F5F54; }
+  .link-box button { margin: 0; width: auto; padding: 7px 14px; font-size: 13px; }
+  /* ── 紀錄表格 ── */
+  .history-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .history-table th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #0F5F54; color: #0F5F54; font-size: 12.5px; }
+  .history-table td { padding: 6px 8px; border-bottom: 1px solid #E3E9E7; }
+  .history-table tr:hover td { background: #F0F5F4; }
+  .history-table a { color: #C8622A; font-weight: 700; text-decoration: none; }
+  .history-table a:hover { text-decoration: underline; }
+  .history-empty { color: #9AA5A1; font-size: 13px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>InspectSummary v9 版面測試（真實schema形狀資料）</h1>
+  <p>貼入一整段真實schema事件陣列（不用自己分前三月/本月，後端會依資料裡最新一筆紀錄的日曆月份自動切分），執行後右側直接預覽產出的圖片。部分欄位（每日狀態四列、尿色/排泄異常、活動投入、精神不佳、拒絕照顧/通報）目前系統無真實資料來源，圖片裡會顯示為固定佔位內容。不想手貼 JSON？<a href="/carenote" style="color:#ffd9a8;">真實資料串接頁</a>可直接用個案編號向照護隨行本拉資料。</p>
+</header>
+<main>
+  <div class="panel left">
+    <h2>個案資訊</h2>
+    <div class="row">
+      <div><label>姓名</label><input id="name" value="測試個案"></div>
+      <div><label>性別</label><input id="gender" value="男"></div>
+    </div>
+    <div class="row">
+      <div><label>年齡</label><input id="age" value="82"></div>
+      <div><label>CFS</label><input id="cfs" value="5"></div>
+    </div>
+    <label>分組</label>
+    <input id="group" value="高齡高血壓組">
+
+    <h2 style="margin-top:20px;">照護紀錄資料（整段，真實schema事件陣列）</h2>
+    <div class="hint">格式：[{"RecordTime": "...", "SystolicPressure": 130, ...}, {"RecordType": "Meal", "OccurredAt": "...", "Content": {...}}, ...]。不用自己分前三月/本月，後端會依資料裡最新一筆紀錄的日曆月份自動切分。</div>
+    <textarea id="eventsData" rows="16" placeholder="貼上整段 _data 事件陣列（前三月＋本月）"></textarea>
+
+    <button id="runBtn">執行運算並產生圖片預覽</button>
+    <div id="status"></div>
+
+    <h2 style="margin-top:24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0F5F54;">
+      <span style="border-bottom:none;">產生紀錄</span>
+      <button id="toggleHistoryBtn" type="button"
+              style="margin:0;width:auto;padding:4px 10px;font-size:12px;">顯示</button>
+    </h2>
+    <div id="historyArea" style="display:none;"><div class="history-empty">尚無紀錄。</div></div>
+  </div>
+  <div class="panel right">
+    <h2>圖片預覽</h2>
+    <div id="downloadArea"></div>
+    <div id="previewArea"><div class="placeholder">填好左側資料後按「執行」。</div></div>
+  </div>
+</main>
+<script>
+const API = '/api/v1';
+const runBtn = document.getElementById('runBtn');
+const statusEl = document.getElementById('status');
+const previewArea = document.getElementById('previewArea');
+const downloadArea = document.getElementById('downloadArea');
+
+function parseJsonField(id, label) {
+  const raw = document.getElementById(id).value.trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('必須是陣列');
+    return parsed;
+  } catch (err) {
+    throw new Error(`${label} JSON格式錯誤：${err.message}`);
+  }
+}
+
+runBtn.addEventListener('click', async () => {
+  statusEl.className = '';
+  statusEl.textContent = '';
+  let eventsData;
+  try {
+    eventsData = parseJsonField('eventsData', '照護紀錄資料');
+  } catch (err) {
+    statusEl.className = 'error';
+    statusEl.textContent = err.message;
+    return;
+  }
+
+  const profile = {
+    name: document.getElementById('name').value,
+    gender: document.getElementById('gender').value,
+    age: document.getElementById('age').value,
+    cfs: document.getElementById('cfs').value,
+    group: document.getElementById('group').value,
+  };
+
+  runBtn.disabled = true;
+  statusEl.textContent = '送出運算中…';
+  try {
+    const res = await fetch(`${API}/v9/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile, data: eventsData }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    await pollUntilDone(data.job_id);
+  } catch (err) {
+    statusEl.className = 'error';
+    statusEl.textContent = `失敗：${err.message}`;
+  } finally {
+    runBtn.disabled = false;
+  }
+});
+
+// ── 輪詢job狀態：運算+LLM潤飾都在背景執行緒跑，可能要等一段時間 ──────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function pollUntilDone(jobId, intervalMs = 1500, maxWaitMs = 120000) {
+  const startedAt = Date.now();
+  while (true) {
+    const res = await fetch(`${API}/v9/${jobId}/status`);
+    const job = await res.json();
+    if (!res.ok) throw new Error(job.detail || `HTTP ${res.status}`);
+
+    if (job.status === 'done') {
+      statusEl.textContent = `完成，job_id=${jobId}（生成方式：${job.generation_method}）`;
+      showReport(jobId);
+      refreshHistory();
+      return;
+    }
+    if (job.status === 'error') {
+      throw new Error(job.error || '運算失敗');
+    }
+    if (Date.now() - startedAt > maxWaitMs) {
+      throw new Error('等待逾時，請稍後至「產生紀錄」查看是否完成');
+    }
+    statusEl.textContent = '運算中…（可能需要呼叫LLM潤飾文字，請稍候）';
+    await sleep(intervalMs);
+  }
+}
+
+// ── 顯示報告：下載鈕 + 獨立連結 + 圖片預覽 ─────────────────────────────────
+// 2026-08-07依醫師會議需求，匯出格式從PDF改成PNG——原本iframe預覽PDF靠
+// 瀏覽器內建PDF檢視器，圖片改用<img>直接顯示更自然，不用套iframe。
+function showReport(id) {
+  const imgUrl = `${API}/v9/${id}/png`;
+  const fullUrl = `${location.origin}${imgUrl}`;
+  downloadArea.innerHTML = `
+    <a class="dl-btn" href="${imgUrl}" download="v9_report_${id}.png">下載圖片</a>
+    <div class="link-box">
+      <input type="text" readonly value="${fullUrl}" onclick="this.select()">
+      <button type="button" onclick="navigator.clipboard.writeText('${fullUrl}').then(()=>{this.textContent='已複製';setTimeout(()=>this.textContent='複製連結',1500)})">複製連結</button>
+      <button type="button" onclick="window.open('${fullUrl}','_blank')">開新分頁</button>
+    </div>`;
+  previewArea.innerHTML = `<img src="${imgUrl}" style="max-width:100%;height:auto;display:block;">`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── 產生紀錄表格 ──────────────────────────────────────────────────────────
+async function refreshHistory() {
+  try {
+    const res = await fetch(`${API}/v9/reports`);
+    if (!res.ok) return;
+    const records = await res.json();
+    const area = document.getElementById('historyArea');
+    if (!records.length) {
+      area.innerHTML = '<div class="history-empty">尚無紀錄。</div>';
+      return;
+    }
+    area.innerHTML = `
+      <table class="history-table">
+        <thead><tr><th>時間</th><th>姓名</th><th>報告</th></tr></thead>
+        <tbody>${records.map(r => `
+          <tr>
+            <td>${esc(r.created_at)}</td>
+            <td>${esc(r.name)}</td>
+            <td><a href="#" onclick="showReport('${r.id}');return false;">預覽</a>&nbsp;&nbsp;
+                <a href="${API}/v9/${r.id}/png" target="_blank">開啟圖片</a></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (_) { /* 紀錄載入失敗不影響主要功能 */ }
+}
+
+refreshHistory();
+
+// ── 產生紀錄顯示/隱藏切換 ─────────────────────────────────────────────────
+// 2026-08-20新增：測試頁每次都會列出所有歷史產生紀錄，筆數一多會把版面
+// 拉得很長、擋住其他區塊——改成預設收合，使用者要看的時候自己按開，不
+// 需要每次都捲過一長串舊紀錄。
+const historyArea = document.getElementById('historyArea');
+const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
+toggleHistoryBtn.addEventListener('click', () => {
+  const hidden = historyArea.style.display === 'none';
+  historyArea.style.display = hidden ? 'block' : 'none';
+  toggleHistoryBtn.textContent = hidden ? '隱藏' : '顯示';
+});
+</script>
+</body>
+</html>
